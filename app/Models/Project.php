@@ -38,14 +38,25 @@ class Project extends Model
      */
     public function getCompletionPercentageAttribute(): float
     {
-        $totalTasks = $this->tasks()->count();
-        
+        // If we have tasks_count attribute, use it
+        if (array_key_exists('tasks_count', $this->attributes)) {
+            $totalTasks = (int) $this->attributes['tasks_count'];
+        } else {
+            // Fallback to querying the database
+            $totalTasks = $this->tasks()->count();
+        }
+
         if ($totalTasks === 0) {
             return 0;
         }
 
-        $completedTasks = $this->tasks()->where('status', 'completed')->count();
-        
+        // If we already have completed_tasks_count, use it
+        if (array_key_exists('completed_tasks_count', $this->attributes)) {
+            $completedTasks = (int) $this->attributes['completed_tasks_count'];
+        } else {
+            $completedTasks = $this->tasks()->where('status', 'completed')->count();
+        }
+
         return round(($completedTasks / $totalTasks) * 100, 2);
     }
 }
