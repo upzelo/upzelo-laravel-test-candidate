@@ -88,6 +88,24 @@ class TaskApiTest extends TestCase
         $this->assertEquals('completed', $tasks[0]['status']);
     }
 
+    public function test_can_filter_tasks_by_priority(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        
+        Task::factory()->create(['project_id' => $project->id, 'priority' => 'low']);
+        Task::factory()->create(['project_id' => $project->id, 'priority' => 'medium']);
+        Task::factory()->create(['project_id' => $project->id, 'priority' => 'high']);
+
+        $response = $this->getJson('/api/tasks?priority=low');
+
+        $response->assertStatus(200);
+        
+        $tasks = $response->json('data');
+        $this->assertCount(1, $tasks);
+        $this->assertEquals('low', $tasks[0]['priority']);
+    }
+
     // Add more test stubs for candidates to implement (OPTIONAL):
     // test_can_show_task_with_related_data()
     // test_task_validation_rules()

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TaskController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,3 +24,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Example structure:
 // Route::apiResource('projects', ProjectController::class);
 // Route::apiResource('tasks', TaskController::class);
+
+Route::apiResource('projects', ProjectController::class)
+                    ->middleware('throttle:3,1');
+
+Route::apiResource('tasks', TaskController::class);
