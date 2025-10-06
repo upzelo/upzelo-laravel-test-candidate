@@ -24,10 +24,10 @@ class TaskApiTest extends TestCase
             'priority' => 'high',
             'project_id' => $project->id,
             'assigned_to' => $user->id,
-            'due_date' => '2024-12-31',
+            'due_date' => '2025-12-31',
         ];
 
-        $response = $this->postJson('/api/tasks', $taskData);
+        $response = $this->postJson('/api/v1/tasks', $taskData);
 
         $response->assertStatus(201)
                 ->assertJsonStructure([
@@ -58,7 +58,7 @@ class TaskApiTest extends TestCase
             'status' => 'pending'
         ]);
 
-        $response = $this->putJson("/api/tasks/{$task->id}", [
+        $response = $this->putJson("/api/v1/tasks/{$task->id}", [
             'status' => 'completed',
         ]);
 
@@ -74,21 +74,119 @@ class TaskApiTest extends TestCase
     {
         $user = User::factory()->create();
         $project = Project::factory()->create(['user_id' => $user->id]);
-        
+
         Task::factory()->create(['project_id' => $project->id, 'status' => 'pending']);
         Task::factory()->create(['project_id' => $project->id, 'status' => 'completed']);
         Task::factory()->create(['project_id' => $project->id, 'status' => 'in_progress']);
 
-        $response = $this->getJson('/api/tasks?status=completed');
+        $response = $this->getJson('/api/v1/tasks?status=completed');
 
         $response->assertStatus(200);
-        
+
         $tasks = $response->json('data');
         $this->assertCount(1, $tasks);
         $this->assertEquals('completed', $tasks[0]['status']);
     }
 
+    public function test_can_delete_task()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->deleteJson("/api/v1/tasks/{$task->id}");
+        $response->assertStatus(204);
+
+        $this->assertDatabaseMissing('tasks', [
+            'id' => $task->id,
+        ]);
+    }
+
     // Add more test stubs for candidates to implement (OPTIONAL):
-    // test_can_show_task_with_related_data()
-    // test_task_validation_rules()
+    public function test_can_show_task_with_related_data()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->getJson("/api/v1/tasks/{$task->id}");
+        $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'data' => [
+                        'id',
+                        'title',
+                        'description',
+                        'status',
+                        'priority',
+                        'project_id',
+                        'project',
+                    ]
+                ]);
+    }
+
+    public function test_task_validation_rules()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $taskData = [
+            'description' => 'A test task description',
+            'status' => 'pending',
+            'priority' => 'high',
+            'project_id' => $project->id,
+            'assigned_to' => $user->id,
+            'due_date' => '2025-12-31',
+        ];
+
+        $response = $this->postJson('/api/v1/tasks', $taskData);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['title']);
+
+        $taskData['title'] = 'Test Task';
+        $taskData['status'] = 'invalid_status';
+        $response = $this->postJson('/api/v1/tasks', $taskData);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_can_get_overdue_tasks()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        Task::factory()->count(3)->create([
+            'project_id' => $project->id,
+            'due_date' => now()->subDays(7),
+            'status' => 'pending',
+        ]);
+
+        Task::factory()->count(2)->create([
+            'project_id' => $project->id,
+        ]);
+
+        $response = $this->getJson('/api/v1/tasks?overdue=true');
+        $response->assertStatus(200);
+        $tasks = $response->json('data');
+        $this->assertCount(3, $tasks);
+    }
+
+    public function test_can_get_high_priority_tasks()
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        Task::factory()->count(3)->create([
+            'project_id' => $project->id,
+            'priority' => 'high',
+            'status' => 'pending',
+        ]);
+
+        Task::factory()->count(2)->create([
+            'project_id' => $project->id,
+            'priority' => 'low',
+        ]);
+
+        $response = $this->getJson('/api/v1/tasks?high_priority=true');
+        $response->assertStatus(200);
+        $tasks = $response->json('data');
+        $this->assertCount(3, $tasks);
+    }
 }
